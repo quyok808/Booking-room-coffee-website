@@ -10,19 +10,19 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, unique: true, sparse: true },
     address: { type: String },
     password: { type: String, required: true },
-    role: { type: mongoose.Schema.Types.ObjectId, ref: "Role" },
+    role: [{ type: mongoose.Schema.Types.ObjectId, ref: "Role" }],
     photo: {
       type: String,
       default:
         "https://res.cloudinary.com/dscrgyvj0/image/upload/v1744610929/defaultAvatar_vpgqz6.jpg"
     },
-    active: { type: Boolean, default: true },
+    active: { type: Boolean, default: false },
     lock: { type: Boolean, default: false },
     passwordResetToken: String,
     passwordResetExpires: Date,
-    emailVerificationToken: String,
-    emailVerificationExpires: Date,
-    passwordChangedAt: Date
+    passwordChangedAt: Date,
+    otp: String,
+    otpExpires: Date
   },
   { timestamps: true }
 );
@@ -58,29 +58,40 @@ userSchema.methods.createPasswordResetToken = function () {
   return resetToken;
 };
 
-// Tạo token để xác thực email
-userSchema.methods.createEmailVerificationToken = function () {
-  const verificationToken = crypto.randomBytes(32).toString("hex");
+// Tạo OTP với chiều dài tùy chỉnh
+userSchema.methods.createOTP = function (length = 6) {
+  const min = Math.pow(10, length - 1);
+  const max = Math.pow(10, length) - 1;
+  const otp = Math.floor(min + Math.random() * (max - min + 1)).toString();
 
-  this.emailVerificationToken = crypto
-    .createHash("sha256")
-    .update(verificationToken)
-    .digest("hex");
-
-  this.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 giờ
-  return verificationToken;
+  this.otp = otp;
+  this.otpExpires = Date.now() + 10 * 60 * 1000; // OTP hết hạn sau 10 phút
+  return otp;
 };
 
+// Kiểm tra OTP hợp lệ
+userSchema.methods.verifyOTP = function (otp) {
+  if (!this.otp || !this.otpExpires) {
+    console.log("null: ", this.otp, this.otpExpires);
+    return false;
+  }
+  if (Date.now() > this.otpExpires) {
+    console.log("exprired");
+    return false;
+  }
+  return this.otp === otp;
+};
+
+// Kiểm tra mật khẩu đã thay đổi sau khi tạo JWT
 userSchema.methods.changedAfter = function (JWTTimestamp) {
   if (this.passwordChangedAt) {
     const changedTimestamp = parseInt(
       this.passwordChangedAt.getTime() / 1000,
       10
     );
-
     return JWTTimestamp < changedTimestamp;
   }
-
   return false;
 };
+
 module.exports = mongoose.model("User", userSchema);

@@ -1,5 +1,16 @@
 const logger = require("./logger");
 
+const options = {
+  timeZone: "Asia/Ho_Chi_Minh",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false // 24h format
+};
+
 const responseUtils = {
   // Success response
   success(res, data, message = "Success", statusCode = 200) {
@@ -7,7 +18,7 @@ const responseUtils = {
       status: "success",
       message,
       data,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toLocaleString("en-GB", options).replace(",", " -")
     };
     return res.status(statusCode).json(responseObj);
   },
@@ -24,7 +35,7 @@ const responseUtils = {
       message,
       errorCode,
       statusCode,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toLocaleString("en-GB", options).replace(",", " -")
     };
     logger.error(
       `${responseObj.timestamp} - ${responseObj.errorCode} - ${responseObj.message} `
@@ -45,7 +56,7 @@ const responseUtils = {
       errorCode: "VALIDATION_ERROR",
       statusCode,
       errors,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toLocaleString("en-GB", options).replace(",", " -")
     };
     return res.status(statusCode).json(responseObj);
   },
@@ -57,7 +68,7 @@ const responseUtils = {
       message,
       errorCode: "UNAUTHORIZED",
       statusCode,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toLocaleString("en-GB", options).replace(",", " -")
     };
     return res.status(statusCode).json(responseObj);
   },
@@ -69,7 +80,7 @@ const responseUtils = {
       message,
       errorCode: "NOT_FOUND",
       statusCode,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toLocaleString("en-GB", options).replace(",", " -")
     };
     return res.status(statusCode).json(responseObj);
   },
@@ -81,7 +92,7 @@ const responseUtils = {
       message,
       errorCode: "CONFLICT",
       statusCode,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toLocaleString("en-GB", options).replace(",", " -")
     };
     return res.status(statusCode).json(responseObj);
   }

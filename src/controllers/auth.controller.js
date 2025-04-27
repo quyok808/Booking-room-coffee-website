@@ -8,7 +8,7 @@ exports.register = async (req, res) => {
     return responseFormat.success(
       res,
       user,
-      "Đăng kí thành công, vui lòng đăng nhập vào tài khoản",
+      "Đăng kí thành công, vui lòng vào email để lấy mã xác thực tài khoản",
       201
     );
   } catch (error) {
@@ -23,6 +23,46 @@ exports.register = async (req, res) => {
       );
     }
     return responseFormat.error(res, error.message);
+  }
+};
+
+exports.verifyEmail = async (req, res) => {
+  try {
+    const user = await authService.verifyEmail(req.body.email, req.body.otp);
+    return responseFormat.success(
+      res,
+      user,
+      "Xác thực tài khoản thành công, vui lòng đăng nhập!"
+    );
+  } catch (error) {
+    if (error instanceof AppError) {
+      return responseFormat.error(
+        res,
+        error.message,
+        error.errorCode,
+        error.statusCode
+      );
+    }
+
+    return responseFormat.error(res, "Đã có lỗi xảy ra. Vui lòng thử lại.");
+  }
+};
+
+exports.resendEmail = async (req, res) => {
+  try {
+    const user = await authService.resendEmail(req.body.email);
+    return responseFormat.success(res, user, "Gửi OTP về email thành công!");
+  } catch (error) {
+    if (error instanceof AppError) {
+      return responseFormat.error(
+        res,
+        error.message,
+        error.errorCode,
+        error.statusCode
+      );
+    }
+
+    return responseFormat.error(res, "Đã có lỗi xảy ra. Vui lòng thử lại.");
   }
 };
 
@@ -49,8 +89,45 @@ exports.login = async (req, res) => {
 exports.logout = async (req, res) => {
   try {
     const user = await authService.logout(req.user.id);
-    return responseFormat.success(res, user, "User logged out successfully");
+    return responseFormat.success(res, user, "Đăng xuất thành công!");
   } catch (error) {
     return responseFormat.error(res, error.message);
+  }
+};
+
+exports.changePassword = async (req, res) => {
+  try {
+    const user = await authService.changePassword(req.user.id, req.body);
+    return responseFormat.success(
+      res,
+      user,
+      "Thay đổi mật khẩu thành công, vui lòng đăng nhập lại!"
+    );
+  } catch (error) {
+    return responseFormat.error(res, error.message);
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const user = await authService.resetPassword(req.query.email);
+    return responseFormat.success(
+      res,
+      user,
+      "Mật khẩu mới đã được gửi về email của bạn, vui lòng kiểm tra hộp thư!"
+    );
+  } catch (error) {
+    // Nếu là AppError thì trả đúng format bạn đã chuẩn hoá
+    if (error instanceof AppError) {
+      return responseFormat.error(
+        res,
+        error.message,
+        error.errorCode,
+        error.statusCode
+      );
+    }
+
+    // Còn lại là lỗi không đoán trước được
+    return responseFormat.error(res, "Đã có lỗi xảy ra. Vui lòng thử lại.");
   }
 };

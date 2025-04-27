@@ -1,13 +1,20 @@
 const userModel = require("../models/user.model");
-const WhitelistedTokenModel = require("../models/whitelistedToken.model");
-const BlacklistedToken = require("../models/blacklistedToken.model");
 const jwt = require("jsonwebtoken");
 const AppError = require("../utils/appError");
 const whitelistedTokenModel = require("../models/whitelistedToken.model");
 const blacklistedTokenModel = require("../models/blacklistedToken.model");
 
+const createOTP = function (length = 6) {
+  const min = Math.pow(10, length - 1);
+  const max = Math.pow(10, length) - 1;
+  const otp = Math.floor(min + Math.random() * (max - min + 1)).toString();
+  return otp;
+};
+
 exports.registerUser = async (user) => {
   try {
+    user.otp = createOTP(6);
+    user.otpExpires = Date.now() + 10 * 60 * 1000;
     const createdUser = await userModel.create(user);
     return createdUser;
   } catch (error) {
@@ -91,16 +98,22 @@ exports.getUsersByRole = async (role) => {
 
 exports.logout = async (id) => {
   try {
-    const loggedOutUser = await userModel.logout(id);
-    return loggedOutUser;
+    const oldTokenDoc = await whitelistedTokenModel.findOne({
+      userId: id
+    });
+    if (oldTokenDoc) {
+      await blacklistedTokenModel.create({ token: oldTokenDoc.token });
+      await whitelistedTokenModel.deleteOne({ _id: oldTokenDoc._id });
+    }
+    return {};
   } catch (error) {
     throw error;
   }
 };
 
-const signToken = (id) => {
+const signToken = (id, rememberme = false) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN
+    expiresIn: rememberme ? process.env.JWT_EXPIRES_IN : "1d"
   });
 };
 
@@ -157,17 +170,80 @@ exports.login = async (user) => {
     }
 
     // TẠO TOKEN MỚI
-    const token = signToken(userInDatabase._id);
+    const token = signToken(userInDatabase._id, user.rememberme);
 
     // LƯU TOKEN MỚI VÀO WHITELIST
     const expiredAt = new Date();
-    expiredAt.setDate(expiredAt.getDate() + 30);
+    expiredAt.setDate(
+      user.rememberme === true
+        ? expiredAt.getDate() + 30
+        : expiredAt.getDate() + 1
+    );
 
     await whitelistedTokenModel.create({
       userId: userInDatabase._id,
-      token
+      token,
+      expiredAt
     });
     return token;
+  } catch (error) {
+    throw error;
+  }
+};
+
+exports.updatePassword = async (id, user) => {
+  try {
+    const existingUser = await userModel.findById(id).select("+password");
+    if (!existingUser) {
+      throw new AppError(
+        "Không tìm thấy thông tin người dùng!",
+        "USER_NOT_FOUND",
+        404
+      );
+    }
+    const checkPass = await existingUser.comparePassword(
+      user.password,
+      existingUser.password
+    );
+
+    if (!checkPass) {
+      throw new AppError("Sai mật khẩu!", "INVALID_CREDENTIALS", 401);
+    }
+
+    // Kiểm tra xem user có chứa mật khẩu mới hay không
+    if (user.password === user.newPassword) {
+      throw new AppError(
+        "Mật khẩu này trùng với mật khẩu cũ, vui lòng sử dụng 1 mật khẩu khác",
+        "CONFLICT_PASSWORD",
+        409
+      );
+    }
+
+    if (user.newPassword !== user.confirmPassword) {
+      throw new AppError(
+        "Xác nhận mật khẩu không khớp, vui lòng kiểm tra lại",
+        "CONFLICT_PASSWORD",
+        409
+      );
+    }
+
+    if (!user.password || !user.newPassword || !user.confirmPassword) {
+      throw new AppError("Vui lòng điền đầy đủ thông tin", "BAD_REQUEST", 400);
+    }
+
+    existingUser.password = user.newPassword;
+
+    const updatedUser = await existingUser.save();
+
+    const oldTokenDoc = await whitelistedTokenModel.findOne({
+      userId: id
+    });
+    if (oldTokenDoc) {
+      await blacklistedTokenModel.create({ token: oldTokenDoc.token });
+      await whitelistedTokenModel.deleteOne({ _id: oldTokenDoc._id });
+    }
+
+    return updatedUser;
   } catch (error) {
     throw error;
   }

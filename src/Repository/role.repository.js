@@ -15,6 +15,7 @@ exports.countRoles = async () => {
 
 exports.createRole = async (name, description, permissions) => {
   try {
+    name = name.toLowerCase();
     const role = await roleModel.create({ name, description, permissions });
     return role;
   } catch (error) {

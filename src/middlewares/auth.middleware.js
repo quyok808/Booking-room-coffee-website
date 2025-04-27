@@ -1,6 +1,5 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/user.model");
-const AppError = require("../utils/appError");
 const BlacklistedToken = require("../models/blacklistedToken.model");
 const responseUtils = require("../utils/response");
 exports.protect = async (req, res, next) => {
@@ -17,7 +16,7 @@ exports.protect = async (req, res, next) => {
     if (!token) {
       return responseUtils.unauthorized(
         res,
-        "You are not logged in! Please log in to get access."
+        "Vui lòng đăng nhập để thực hiện chức năng này."
       );
     }
 
@@ -26,7 +25,7 @@ exports.protect = async (req, res, next) => {
     if (blacklistedToken) {
       return responseUtils.unauthorized(
         res,
-        "Invalid token! Please log in again."
+        "Phiên đăng nhập không tồn tại, vui lòng đăng nhập lại."
       );
     }
 
@@ -38,7 +37,7 @@ exports.protect = async (req, res, next) => {
     if (!currentUser) {
       return responseUtils.unauthorized(
         res,
-        "The user belonging to this token does no longer exist."
+        "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại."
       );
     }
 
@@ -46,7 +45,7 @@ exports.protect = async (req, res, next) => {
     if (currentUser.changedAfter && currentUser.changedAfter(decoded.iat)) {
       return responseUtils.unauthorized(
         res,
-        "User recently changed password! Please log in again."
+        "Tài khoản đã được thay đổi mật khẩu, vui lòng đăng nhập lại."
       );
     }
 
@@ -57,25 +56,33 @@ exports.protect = async (req, res, next) => {
     if (error.name === "JsonWebTokenError") {
       return responseUtils.unauthorized(
         res,
-        "Invalid token! Please log in again."
+        "Có lỗi xảy ra trong quá trình xác thực, vui lòng đăng nhập lại."
       );
     }
     if (error.name === "TokenExpiredError") {
       return responseUtils.unauthorized(
         res,
-        "Your token has expired! Please log in again."
+        "Phiên đăng nhập hết hạn, vui lòng đăng nhập lại"
       );
     }
-    return responseUtils.error(res, "Authentication failed.");
+    return responseUtils.error(res, "Lỗi xác thực !");
   }
 };
 
 exports.restrictTo = (...roles) => {
-  return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
+  return async (req, res, next) => {
+    const user = await User.findById(req.user.id).populate("role", "name");
+
+    const userRoleNames = user.role.map((r) => r.name);
+
+    const hasPermission = userRoleNames.some((roleName) =>
+      roles.includes(roleName)
+    );
+
+    if (!hasPermission) {
       return responseUtils.unauthorized(
         res,
-        "You do not have permission to perform this action",
+        "Bạn không có quyền để thực hiện chức năng này. Nếu đây là sự nhầm lẫn vui lòng liên hệ QTV để giải quyết.",
         403
       );
     }
